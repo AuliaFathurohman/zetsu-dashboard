@@ -111,7 +111,7 @@ export default function TasksPage() {
         </div>
       </div>
 
-      <Card className="border-gray-200 dark:border-gray-700">
+      <Card className="border-white dark:border-white">
         <CardHeader>
           <CardTitle className="text-gray-900 dark:text-white">
             All Tasks ({total.toLocaleString()})
@@ -121,7 +121,7 @@ export default function TasksPage() {
           {loading ? (
             <div className="h-96 bg-gray-100 dark:bg-gray-800 animate-pulse rounded" />
           ) : tasks.length === 0 ? (
-            <div className="text-center py-10 text-gray-600 dark:text-gray-400">
+            <div className="text-center py-10 text-white dark:text-white">
               <p>No tasks available</p>
               <p className="text-sm mt-2">Backend connection pending...</p>
             </div>

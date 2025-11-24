@@ -74,27 +74,27 @@ export default function NodesPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-gray-200 dark:border-gray-700">
+        <Card className="border-white dark:border-white">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Nodes</CardTitle>
+            <CardTitle className="text-sm font-medium text-white dark:text-white">Total Nodes</CardTitle>
             <Server className="h-4 w-4 text-gray-500 dark:text-gray-400" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900 dark:text-white">{nodes.length}</div>
           </CardContent>
         </Card>
-        <Card className="border-gray-200 dark:border-gray-700">
+        <Card className="border-white dark:border-white">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-700 dark:text-gray-300">Nodes Up</CardTitle>
+            <CardTitle className="text-sm font-medium text-white dark:text-white">Nodes Up</CardTitle>
             <Server className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900 dark:text-white">{upNodes}</div>
           </CardContent>
         </Card>
-        <Card className="border-gray-200 dark:border-gray-700">
+        <Card className="border-white dark:border-white">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-700 dark:text-gray-300">Nodes Down</CardTitle>
+            <CardTitle className="text-sm font-medium text-white dark:text-white">Nodes Down</CardTitle>
             <Server className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
@@ -103,7 +103,7 @@ export default function NodesPage() {
         </Card>
       </div>
 
-      <Card className="border-gray-200 dark:border-gray-700">
+      <Card className="border-white dark:border-white">
         <CardHeader>
           <CardTitle className="text-gray-900 dark:text-white">All Nodes</CardTitle>
         </CardHeader>
@@ -111,7 +111,7 @@ export default function NodesPage() {
           {loading ? (
             <div className="h-96 bg-gray-100 dark:bg-gray-800 animate-pulse rounded" />
           ) : nodes.length === 0 ? (
-            <div className="text-center py-10 text-gray-600 dark:text-gray-400">
+            <div className="text-center py-10 text-white dark:text-white">
               <p>No nodes available</p>
               <p className="text-sm mt-2">Backend connection pending...</p>
             </div>
@@ -120,12 +120,12 @@ export default function NodesPage() {
               <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-gray-700 dark:text-gray-300">ID</TableHead>
-                      <TableHead className="text-gray-700 dark:text-gray-300">Name</TableHead>
-                      <TableHead className="text-gray-700 dark:text-gray-300">Host</TableHead>
-                      <TableHead className="text-gray-700 dark:text-gray-300">Status</TableHead>
-                      <TableHead className="text-gray-700 dark:text-gray-300">Created</TableHead>
-                      <TableHead className="text-gray-700 dark:text-gray-300">Last Updated</TableHead>
+                      <TableHead className="text-white dark:text-white">ID</TableHead>
+                      <TableHead className="text-white dark:text-white">Name</TableHead>
+                      <TableHead className="text-white dark:text-white">Host</TableHead>
+                      <TableHead className="text-white dark:text-white">Status</TableHead>
+                      <TableHead className="text-white dark:text-white">Created</TableHead>
+                      <TableHead className="text-white dark:text-white">Last Updated</TableHead>
                     </TableRow>
                   </TableHeader>
                 <TableBody>
@@ -137,12 +137,12 @@ export default function NodesPage() {
                       <TableCell className="font-medium text-gray-900 dark:text-white">{node.name}</TableCell>
                       <TableCell className="font-mono text-gray-900 dark:text-white">{node.host}</TableCell>
                       <TableCell>{getStatusBadge(node.status)}</TableCell>
-                      <TableCell className="text-xs text-gray-600 dark:text-gray-400">
+                      <TableCell className="text-xs text-white dark:text-white">
                         {formatDistanceToNow(new Date(node.createdAt), {
                           addSuffix: true,
                         })}
                       </TableCell>
-                      <TableCell className="text-xs text-gray-600 dark:text-gray-400">
+                      <TableCell className="text-xs text-white dark:text-white">
                         {formatDistanceToNow(new Date(node.updatedAt), {
                           addSuffix: true,
                         })}
