@@ -13,7 +13,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -23,29 +22,24 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatDistanceToNow } from 'date-fns'
-import { RefreshCw, Users, Upload, FileText } from 'lucide-react'
+import { RefreshCw, Users, Upload, FileText, Edit, X } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 
 interface Account {
   id: string
   username: string
+  password: string
   host: string
   status: string
-  country: string | null
+  proxyId: string | null
   attempts: number
+  country: string | null
   createdAt: string
   updatedAt: string
   blockedAt: string | null
   pausedAt: string | null
-  proxy: {
-    host: string
-    port: number
-    status: string
-  } | null
-  browser: {
-    id: string
-    port: number
-    status: string
-  } | null
+  cookiesCount: number
+  hasCookies: boolean
 }
 
 export default function AccountsPage() {
@@ -53,22 +47,39 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   
+  // Filter state
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [countryFilter, setCountryFilter] = useState<string>('all')
+  const [cookiesFilter, setCookiesFilter] = useState<string>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  
   // Bulk form state
   const [bulkAccounts, setBulkAccounts] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [host, setHost] = useState('shopee.co.id')
   const [country, setCountry] = useState('id')
+  
+  // Selection state
+  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(new Set())
+  const [isUpdating, setIsUpdating] = useState(false)
+  
+  // Update form state
+  const [updateData, setUpdateData] = useState({
+    status: '',
+    host: '',
+    proxyId: '',
+    attempts: ''
+  })
 
   const fetchAccounts = async () => {
     setLoading(true)
     try {
-      // COMMENTED: API call to backend
-      // const response = await fetch('/api/accounts')
-      // const data = await response.json()
-      // setAccounts(data.accounts)
-      
-      // TODO: Uncomment when backend is ready
-      console.log('Accounts API call commented - waiting for backend setup')
+      const response = await fetch('http://localhost:3001/accounts')
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const data = await response.json()
+      setAccounts(data.accounts || data)
     } catch (error) {
       console.error('Error fetching accounts:', error)
     } finally {
@@ -78,25 +89,57 @@ export default function AccountsPage() {
 
   useEffect(() => {
     fetchAccounts()
-    // Auto-refresh commented for now
-    // const interval = setInterval(fetchAccounts, 15000)
-    // return () => clearInterval(interval)
   }, [])
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      IDLE: 'bg-gray-500',
-      RUNNING: 'bg-green-500',
-      BLOCKED: 'bg-red-500',
-      PAUSE: 'bg-yellow-500',
+      IDLE: 'bg-gray-500 text-white',
+      RUNNING: 'bg-green-500 text-white',
+      BLOCKED: 'bg-red-500 text-white',
+      PAUSE: 'bg-yellow-500 text-white',
     }
 
     return (
-      <Badge className={colors[status] || 'bg-gray-500'}>
+      <Badge className={colors[status] || 'bg-gray-500 text-white'}>
         {status}
       </Badge>
     )
   }
+
+  // Apply filters
+  const filteredAccounts = accounts.filter((account) => {
+    // Status filter
+    if (statusFilter !== 'all' && account.status !== statusFilter) {
+      return false
+    }
+    
+    // Country filter
+    if (countryFilter !== 'all' && account.country !== countryFilter) {
+      return false
+    }
+    
+    // Cookies filter
+    if (cookiesFilter !== 'all') {
+      if (cookiesFilter === 'has-cookies' && !account.hasCookies) {
+        return false
+      }
+      if (cookiesFilter === 'no-cookies' && account.hasCookies) {
+        return false
+      }
+    }
+    
+    // Search filter (username or host)
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      const matchUsername = account.username.toLowerCase().includes(query)
+      const matchHost = account.host.toLowerCase().includes(query)
+      if (!matchUsername && !matchHost) {
+        return false
+      }
+    }
+    
+    return true
+  })
 
   const idleAccounts = accounts.filter((a) => a.status === 'IDLE').length
   const activeAccounts = accounts.filter((a) => a.status === 'RUNNING').length
@@ -177,6 +220,82 @@ export default function AccountsPage() {
     }
   }
 
+  // Selection handlers
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedAccountIds(new Set(filteredAccounts.map(a => a.id)))
+    } else {
+      setSelectedAccountIds(new Set())
+    }
+  }
+
+  const handleSelectAccount = (accountId: string, checked: boolean) => {
+    const newSelection = new Set(selectedAccountIds)
+    if (checked) {
+      newSelection.add(accountId)
+    } else {
+      newSelection.delete(accountId)
+    }
+    setSelectedAccountIds(newSelection)
+  }
+
+  // Bulk update handler
+  const handleBulkUpdate = async () => {
+    if (selectedAccountIds.size === 0) {
+      alert('⚠️ Please select at least one account!')
+      return
+    }
+
+    // Build update payload with only non-empty fields
+    const payload: any = {}
+    if (updateData.status) payload.status = updateData.status
+    if (updateData.host) payload.host = updateData.host
+    if (updateData.proxyId) payload.proxyId = updateData.proxyId
+    if (updateData.attempts) payload.attempts = parseInt(updateData.attempts)
+
+    if (Object.keys(payload).length === 0) {
+      alert('⚠️ Please fill at least one field to update!')
+      return
+    }
+
+    setIsUpdating(true)
+
+    try {
+      const updatePromises = Array.from(selectedAccountIds).map(accountId =>
+        fetch(`http://localhost:3001/accounts/${accountId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload)
+        })
+      )
+
+      const results = await Promise.all(updatePromises)
+      
+      const successCount = results.filter(r => r.ok).length
+      const failCount = results.length - successCount
+
+      if (successCount > 0) {
+        alert(`✅ ${successCount} account(s) updated successfully!${failCount > 0 ? ` (${failCount} failed)` : ''}`)
+        
+        // Reset selection and form
+        setSelectedAccountIds(new Set())
+        setUpdateData({ status: '', host: '', proxyId: '', attempts: '' })
+        
+        // Refresh accounts
+        fetchAccounts()
+      } else {
+        alert('❌ Failed to update accounts')
+      }
+    } catch (error) {
+      console.error('Error updating accounts:', error)
+      alert('❌ Failed to update accounts')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between">
@@ -250,9 +369,9 @@ export default function AccountsPage() {
             {/* Config Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
               <div className="space-y-2">
-                <Label htmlFor="host" className="text-gray-900 dark:text-white">
+                <label htmlFor="host" className="text-sm font-medium text-gray-900 dark:text-white">
                   Host <span className="text-red-500">*</span>
-                </Label>
+                </label>
                 <Select value={host} onValueChange={setHost}>
                   <SelectTrigger className="border-gray-300 dark:border-gray-600 text-white dark:text-white bg-white dark:bg-gray-900">
                     <SelectValue />
@@ -270,9 +389,9 @@ export default function AccountsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="country" className="text-gray-900 dark:text-white">
+                <label htmlFor="country" className="text-sm font-medium text-gray-900 dark:text-white">
                   Country <span className="text-red-500">*</span>
-                </Label>
+                </label>
                 <Select value={country} onValueChange={setCountry}>
                   <SelectTrigger className="border-gray-300 dark:border-gray-600 text-white dark:text-white bg-white dark:bg-gray-900">
                     <SelectValue />
@@ -292,10 +411,10 @@ export default function AccountsPage() {
 
             {/* File Upload */}
             <div className="space-y-2">
-              <Label htmlFor="file" className="text-gray-900 dark:text-white flex items-center gap-2">
+              <label htmlFor="file" className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 Upload .txt File (Optional)
-              </Label>
+              </label>
               <Input
                 id="file"
                 type="file"
@@ -312,9 +431,9 @@ export default function AccountsPage() {
 
             {/* Direct Input */}
             <div className="space-y-2">
-              <Label htmlFor="bulkAccounts" className="text-gray-900 dark:text-white">
+              <label htmlFor="bulkAccounts" className="text-sm font-medium text-gray-900 dark:text-white">
                 Or Paste Accounts Here
-              </Label>
+              </label>
               <Textarea
                 id="bulkAccounts"
                 placeholder={`Example:
@@ -324,8 +443,7 @@ gggaming6668@gmail.com|Ikeh12345`}
                 value={bulkAccounts}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setBulkAccounts(e.target.value)}
                 rows={8}
-                className="border-gray-300 dark:border-gray-600 font-mono text-sm bg-background"
-                style={{ color: 'rgba(249, 250, 251, 0.24)' }}
+                className="border-gray-300 dark:border-gray-600 font-mono text-sm bg-background text-white dark:text-white placeholder:text-[rgba(249,250,251,0.24)]"
               />
               <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
                 <p className="text-xs text-blue-700 dark:text-blue-300 font-semibold mb-2">
@@ -366,9 +484,191 @@ gggaming6668@gmail.com|Ikeh12345`}
         </CardContent>
       </Card>
 
+      {/* Bulk Update Panel */}
+      {selectedAccountIds.size > 0 && (
+        <Card className="border-2 border-white dark:border-white bg-blue-50 dark:bg-blue-900/20">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-white dark:text-white flex items-center gap-2">
+                <Edit className="h-5 w-5" />
+                Bulk Update ({selectedAccountIds.size} selected)
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSelectedAccountIds(new Set())}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Status Update */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-900 dark:text-white">
+                  Status
+                </label>
+                <Select 
+                  value={updateData.status} 
+                  onValueChange={(value) => setUpdateData({...updateData, status: value})}
+                >
+                  <SelectTrigger className="border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-white dark:text-white">
+                    <SelectValue placeholder="No change" className="text-white dark:text-white" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-gray-900 text-white dark:text-white border-gray-200 dark:border-gray-700">
+                    <SelectItem value="IDLE" className="text-white dark:text-white hover:bg-blue-600">IDLE</SelectItem>
+                    <SelectItem value="RUNNING" className="text-white dark:text-white hover:bg-blue-600">RUNNING</SelectItem>
+                    <SelectItem value="BLOCKED" className="text-white dark:text-white hover:bg-blue-600">BLOCKED</SelectItem>
+                    <SelectItem value="PAUSE" className="text-white dark:text-white hover:bg-blue-600">PAUSE</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Host Update */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-white dark:text-white">
+                  Host
+                </label>
+                <Select 
+                  value={updateData.host} 
+                  onValueChange={(value) => setUpdateData({...updateData, host: value})}
+                >
+                  <SelectTrigger className="border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-white dark:text-white">
+                    <SelectValue placeholder="No change" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+                    <SelectItem value="shopee.co.id" className="text-white dark:text-white hover:bg-blue-600">shopee.co.id</SelectItem>
+                    <SelectItem value="shopee.co.th" className="text-white dark:text-white hover:bg-blue-600">shopee.co.th</SelectItem>
+                    <SelectItem value="shopee.sg" className="text-white dark:text-white hover:bg-blue-600">shopee.sg</SelectItem>
+                    <SelectItem value="shopee.com.my" className="text-white dark:text-white hover:bg-blue-600">shopee.com.my</SelectItem>
+                    <SelectItem value="shopee.vn" className="text-white dark:text-white hover:bg-blue-600">shopee.vn</SelectItem>
+                    <SelectItem value="shopee.ph" className="text-white dark:text-white hover:bg-blue-600">shopee.ph</SelectItem>
+                    <SelectItem value="shopee.tw" className="text-white dark:text-white hover:bg-blue-600">shopee.tw</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Proxy ID Update */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-white dark:text-white">
+                  Proxy ID
+                </label>
+                <Input
+                  placeholder="No change"
+                  value={updateData.proxyId}
+                  onChange={(e) => setUpdateData({...updateData, proxyId: e.target.value})}
+                  className="border-gray-300 dark:border-gray-600 text-white dark:text-white"
+                />
+              </div>
+
+              {/* Attempts Update */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-white dark:text-white">
+                  Attempts
+                </label>
+                <Input
+                  type="number"
+                  placeholder="No change"
+                  value={updateData.attempts}
+                  onChange={(e) => setUpdateData({...updateData, attempts: e.target.value})}
+                  className="border-gray-300 dark:border-gray-600 text-white dark:text-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedAccountIds(new Set())
+                  setUpdateData({ status: '', host: '', proxyId: '', attempts: '' })
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleBulkUpdate}
+                disabled={isUpdating}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isUpdating ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Update {selectedAccountIds.size} Account(s)
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="border-gray-200 dark:border-gray-700">
         <CardHeader>
-          <CardTitle className="text-gray-900 dark:text-white">All Accounts</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-gray-900 dark:text-white">All Accounts</CardTitle>
+            <div className="flex items-center gap-2">
+              {/* Search */}
+              <Input
+                placeholder="Search username or host..."
+                value={searchQuery}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+                className="w-[250px] border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+              />
+              
+              {/* Status Filter */}
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[150px] border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+                  <SelectItem value="all" className="text-white dark:text-white hover:bg-blue-600 hover:text-white">All Status</SelectItem>
+                  <SelectItem value="IDLE" className="text-white dark:text-white hover:bg-blue-600 hover:text-white">Idle</SelectItem>
+                  <SelectItem value="RUNNING" className="text-white dark:text-white hover:bg-blue-600 hover:text-white">Running</SelectItem>
+                  <SelectItem value="BLOCKED" className="text-white dark:text-white hover:bg-blue-600 hover:text-white">Blocked</SelectItem>
+                  <SelectItem value="PAUSE" className="text-white dark:text-white hover:bg-blue-600 hover:text-white">Paused</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {/* Country Filter */}
+              <Select value={countryFilter} onValueChange={setCountryFilter}>
+                <SelectTrigger className="w-[150px] border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
+                  <SelectValue placeholder="Country" />
+                </SelectTrigger>
+                <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+                  <SelectItem value="all" className="text-white dark:text-white hover:bg-blue-600 hover:text-white">All Countries</SelectItem>
+                  <SelectItem value="id" className="text-white dark:text-white hover:bg-blue-600 hover:text-white">Indonesia</SelectItem>
+                  <SelectItem value="th" className="text-white dark:text-white hover:bg-blue-600 hover:text-white">Thailand</SelectItem>
+                  <SelectItem value="sg" className="text-white dark:text-white hover:bg-blue-600 hover:text-white">Singapore</SelectItem>
+                  <SelectItem value="my" className="text-white dark:text-white hover:bg-blue-600 hover:text-white">Malaysia</SelectItem>
+                  <SelectItem value="vn" className="text-white dark:text-white hover:bg-blue-600 hover:text-white">Vietnam</SelectItem>
+                  <SelectItem value="ph" className="text-white dark:text-white hover:bg-blue-600 hover:text-white">Philippines</SelectItem>
+                  <SelectItem value="tw" className="text-white dark:text-white hover:bg-blue-600 hover:text-white">Taiwan</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {/* Cookies Filter */}
+              <Select value={cookiesFilter} onValueChange={setCookiesFilter}>
+                <SelectTrigger className="w-[150px] border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
+                  <SelectValue placeholder="Cookies" />
+                </SelectTrigger>
+                <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+                  <SelectItem value="all" className="text-white dark:text-white hover:bg-blue-600 hover:text-white">All Cookies</SelectItem>
+                  <SelectItem value="has-cookies" className="text-white dark:text-white hover:bg-blue-600 hover:text-white">🍪 Has Cookies</SelectItem>
+                  <SelectItem value="no-cookies" className="text-white dark:text-white hover:bg-blue-600 hover:text-white">No Cookies</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+            Showing {filteredAccounts.length} of {accounts.length} accounts
+          </p>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -383,75 +683,65 @@ gggaming6668@gmail.com|Ikeh12345`}
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Username</TableHead>
-                    <TableHead>Host</TableHead>
-                    <TableHead>Country</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Proxy</TableHead>
-                    <TableHead>Browser</TableHead>
-                    <TableHead>Attempts</TableHead>
-                    <TableHead>Last Updated</TableHead>
+                    <TableHead className="w-[50px] text-gray-700 dark:text-gray-300">
+                      <Checkbox
+                        checked={selectedAccountIds.size === filteredAccounts.length && filteredAccounts.length > 0}
+                        onCheckedChange={handleSelectAll}
+                      />
+                    </TableHead>
+                    <TableHead className="text-gray-700 dark:text-gray-300">ID</TableHead>
+                    <TableHead className="text-gray-700 dark:text-gray-300">Username</TableHead>
+                    <TableHead className="text-gray-700 dark:text-gray-300">Host</TableHead>
+                    <TableHead className="text-gray-700 dark:text-gray-300">Country</TableHead>
+                    <TableHead className="text-gray-700 dark:text-gray-300">Status</TableHead>
+                    <TableHead className="text-gray-700 dark:text-gray-300">Proxy ID</TableHead>
+                    <TableHead className="text-gray-700 dark:text-gray-300">Attempts</TableHead>
+                    <TableHead className="text-gray-700 dark:text-gray-300">Cookies</TableHead>
+                    <TableHead className="text-gray-700 dark:text-gray-300">Last Updated</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {accounts.map((account) => (
+                  {filteredAccounts.map((account) => (
                     <TableRow key={account.id}>
-                      <TableCell className="font-mono text-xs">
-                        {account.id.substring(0, 8)}
+                      <TableCell className="text-white dark:text-white">
+                        <Checkbox
+                          checked={selectedAccountIds.has(account.id)}
+                          onCheckedChange={(checked) => handleSelectAccount(account.id, checked as boolean)}
+                        />
                       </TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-mono text-xs text-gray-900 dark:text-white">
+                        {account.id}
+                      </TableCell>
+                      <TableCell className="font-medium text-gray-900 dark:text-white">
                         {account.username}
                       </TableCell>
-                      <TableCell className="text-xs">{account.host}</TableCell>
+                      <TableCell className="text-xs text-gray-900 dark:text-white">{account.host}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">
+                        <Badge variant="outline" className="text-gray-900 dark:text-white">
                           {account.country?.toUpperCase() || 'ALL'}
                         </Badge>
                       </TableCell>
                       <TableCell>{getStatusBadge(account.status)}</TableCell>
+                      <TableCell className="font-mono text-xs text-gray-900 dark:text-white">
+                        {account.proxyId || '-'}
+                      </TableCell>
                       <TableCell>
-                        {account.proxy ? (
-                          <div className="flex flex-col">
-                            <span className="text-xs font-mono">
-                              {account.proxy.host}:{account.proxy.port}
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className="w-fit text-xs mt-1"
-                            >
-                              {account.proxy.status}
+                        <Badge variant="secondary" className="text-gray-900 dark:text-white">{account.attempts}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {account.hasCookies ? (
+                            <Badge className="bg-green-500 text-white">
+                              🍪 {account.cookiesCount}
                             </Badge>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            No proxy
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {account.browser ? (
-                          <div className="flex flex-col">
-                            <span className="text-xs font-mono">
-                              Port {account.browser.port}
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className="w-fit text-xs mt-1"
-                            >
-                              {account.browser.status}
+                          ) : (
+                            <Badge variant="outline" className="text-gray-500">
+                              No cookies
                             </Badge>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            No browser
-                          </span>
-                        )}
+                          )}
+                        </div>
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{account.attempts}</Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="text-xs text-gray-600 dark:text-gray-400">
                         {formatDistanceToNow(new Date(account.updatedAt), {
                           addSuffix: true,
                         })}

@@ -22,9 +22,6 @@ interface Node {
   status: string
   createdAt: string
   updatedAt: string
-  _count: {
-    browsers: number
-  }
 }
 
 export default function NodesPage() {
@@ -34,13 +31,12 @@ export default function NodesPage() {
   const fetchNodes = async () => {
     setLoading(true)
     try {
-      // COMMENTED: API call to backend
-      // const response = await fetch('/api/nodes')
-      // const data = await response.json()
-      // setNodes(data.nodes)
-      
-      // TODO: Uncomment when backend is ready
-      console.log('Nodes API call commented - waiting for backend setup')
+      const response = await fetch('http://localhost:3001/nodes')
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const data = await response.json()
+      setNodes(data.nodes || data)
     } catch (error) {
       console.error('Error fetching nodes:', error)
     } finally {
@@ -50,15 +46,15 @@ export default function NodesPage() {
 
   useEffect(() => {
     fetchNodes()
-    // Auto-refresh commented for now
-    // const interval = setInterval(fetchNodes, 15000)
-    // return () => clearInterval(interval)
+    // Auto-refresh every 15 seconds
+    const interval = setInterval(fetchNodes, 15000)
+    return () => clearInterval(interval)
   }, [])
 
   const getStatusBadge = (status: string) => {
     return (
       <Badge
-        className={status === 'UP' ? 'bg-green-500' : 'bg-red-500'}
+        className={status === 'UP' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}
       >
         {status}
       </Badge>
@@ -67,7 +63,6 @@ export default function NodesPage() {
 
   const upNodes = nodes.filter((n) => n.status === 'UP').length
   const downNodes = nodes.filter((n) => n.status === 'DOWN').length
-  const totalBrowsers = nodes.reduce((acc, n) => acc + n._count.browsers, 0)
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
@@ -78,7 +73,7 @@ export default function NodesPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card className="border-gray-200 dark:border-gray-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Nodes</CardTitle>
@@ -106,15 +101,6 @@ export default function NodesPage() {
             <div className="text-2xl font-bold text-gray-900 dark:text-white">{downNodes}</div>
           </CardContent>
         </Card>
-        <Card className="border-gray-200 dark:border-gray-700">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Browsers</CardTitle>
-            <Server className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{totalBrowsers}</div>
-          </CardContent>
-        </Card>
       </div>
 
       <Card className="border-gray-200 dark:border-gray-700">
@@ -132,37 +118,31 @@ export default function NodesPage() {
           ) : (
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Host</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Browsers</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Last Updated</TableHead>
-                  </TableRow>
-                </TableHeader>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-gray-700 dark:text-gray-300">ID</TableHead>
+                      <TableHead className="text-gray-700 dark:text-gray-300">Name</TableHead>
+                      <TableHead className="text-gray-700 dark:text-gray-300">Host</TableHead>
+                      <TableHead className="text-gray-700 dark:text-gray-300">Status</TableHead>
+                      <TableHead className="text-gray-700 dark:text-gray-300">Created</TableHead>
+                      <TableHead className="text-gray-700 dark:text-gray-300">Last Updated</TableHead>
+                    </TableRow>
+                  </TableHeader>
                 <TableBody>
                   {nodes.map((node) => (
                     <TableRow key={node.id}>
-                      <TableCell className="font-mono text-xs">
-                        {node.id.substring(0, 8)}
+                      <TableCell className="font-mono text-xs text-gray-900 dark:text-white">
+                        {node.id}
                       </TableCell>
-                      <TableCell className="font-medium">{node.name}</TableCell>
-                      <TableCell className="font-mono">{node.host}</TableCell>
+                      <TableCell className="font-medium text-gray-900 dark:text-white">{node.name}</TableCell>
+                      <TableCell className="font-mono text-gray-900 dark:text-white">{node.host}</TableCell>
                       <TableCell>{getStatusBadge(node.status)}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          {node._count.browsers}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="text-xs text-gray-600 dark:text-gray-400">
                         {formatDistanceToNow(new Date(node.createdAt), {
                           addSuffix: true,
                         })}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="text-xs text-gray-600 dark:text-gray-400">
                         {formatDistanceToNow(new Date(node.updatedAt), {
                           addSuffix: true,
                         })}
